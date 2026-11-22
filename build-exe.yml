@@ -1,0 +1,50 @@
+name: Test and build Windows .exe
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to attach the .exe to a GitHub Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Unit tests
+        run: python -m pytest -v
+
+      - name: Validation self-test
+        run: python main.py --selftest
+
+      - name: Build .exe
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name EV-Charging-Emission-Calculator
+          --hidden-import matplotlib.backends.backend_tkagg
+          --hidden-import matplotlib.backends.backend_pdf
+          main.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EV-Charging-Emission-Calculator-windows
+          path: dist/EV-Charging-Emission-Calculator.exe
+
+      - name: Attach .exe to the GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/EV-Charging-Emission-Calculator.exe
